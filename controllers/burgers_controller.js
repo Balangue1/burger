@@ -1,75 +1,54 @@
+// Dependencies
 var express = require("express");
+// Import the model to use its db functions for burger.js
+var burger = require("../models/burger.js");
 
+// Create the router for the app, and export the router at the end of your file.
 var router = express.Router();
-
-var db = require("../models");
-
-router.get("/", function(req, res) {
-    res.redirect("/burgers");
-});
-
-router.get("/burgers", function(req, res) {
-    db.Burger.findAll({
-        order: [
-            ["burger_name", "ASC"]
-        ],
-        include: [{
-            model: db.Customer,
-            attributes: ["customer_name"]
-        }]
-    }).then(function(allBurgers) {
+// Create routes and set up logic where required.
+router.get("/", function (req, res) {
+    burger.selectAll(function(data) {
         var hbsObject = {
-            burgers: allBurgers
+            burgers: data
         };
+        console.log(hbsObject);
         res.render("index", hbsObject);
     });
 });
-
-router.post("/burgers/create", function(req, res) {
-    return db.Burger.create({
-        burger_name: req.body.burgerName
-    }).then(function() {
-        res.redirect("/burgers");
+// Add new burger to the db.
+router.post("/api/burgers", function (req, res) {
+    burger.insertOne(["burger_name", "devoured"], [req.body.burger_name, req.body.devoured], function(result) {
+        // Send back the ID of the new burger
+        res.json({ id: result.insertId });
     });
 });
+// Set burger devoured status to true.
+router.put("/api/burgers/:id", function(req, res) {
+    var condition = "id = " + req.params.id;
 
-router.put("/burgers/update/devour/:id", function(req, res) {
-    return db.Customer.create({
-        customer_name: req.body.customer
-    }).then(function(newCustomer) {
-        return db.Burger.update({
-            devoured: req.body.devoured,
-            CustomerId: newCustomer.id
-        }, {
-            where: {
-                id: req.params.id
-            },
-            include: [db.Customer]
-        });
-    }).then(function() {
-        res.redirect("/burgers");
-    });
-});
+    console.log("condition", condition);
 
-router.put("/burgers/update/return/:id", function(req, res) {
-    return db.Burger.update({
-        devoured: req.body.devoured
-    }, {
-        where: {
-            id: req.params.id
+    burger.updateOne({ devoured: req.body.devoured }, condition, function(result) {
+        if (result.changedRows === 0) {
+            // If no rows were changed, then the ID must not exist, so 404.
+            return res.status(404).end();
+        } else {
+            res.status(200).end();
         }
-    }).then(function() {
-        res.redirect("/burgers");
     });
 });
+// Delete burger from db.
+router.delete("/api/burgers/:id", function(req, res) {
+    var condition = "id = " + req.params.id;
+    console.log("condition", condition);
 
-router.delete("/burgers/delete/:id", function(req, res) {
-    return db.Burger.destroy({
-        where: {
-            id: req.params.id
+    burger.deleteOne(condition, function(result) {
+        if (result.changedRows === 0) {
+            // If no rows were changed, then the ID must not exist, so 404.
+            return res.status(404).end();
+        } else {
+            res.status(200).end();
         }
-    }).then(function() {
-        res.redirect("/burgers");
     });
 });
 
